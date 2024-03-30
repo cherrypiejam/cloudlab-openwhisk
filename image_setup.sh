@@ -1,10 +1,10 @@
 #!/bin/bash
 set -x
 
-# Use particular docker and kubernetes versions. When I've tried to upgrade, I've seen slowdowns in 
+# Use particular docker and kubernetes versions. When I've tried to upgrade, I've seen slowdowns in
 # pod creation.
 DOCKER_VERSION_STRING=5:20.10.12~3-0~ubuntu-focal
-KUBERNETES_VERSION_STRING=1.23.3-00
+KUBERNETES_VERSION_STRING=1.28.8-1.1
 
 # Unlike home directories, this directory will be included in the image
 OW_USER_GROUP=owuser
@@ -36,7 +36,7 @@ echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
   $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
-sudo apt install -y docker-ce=$DOCKER_VERSION_STRING docker-ce-cli=$DOCKER_VERSION_STRING containerd.io docker-compose-plugin
+sudo apt install -y docker-ce=$DOCKER_VERSION_STRING docker-ce-cli=$DOCKER_VERSION_STRING containerd.io docker-compose-plugin --allow-downgrades
 
 # Set to use cgroupdriver
 echo -e '{
@@ -51,8 +51,10 @@ sudo systemctl restart docker || (echo "ERROR: Docker installation failed, exiti
 sudo docker run hello-world | grep "Hello from Docker!" || (echo "ERROR: Docker installation failed, exiting." && exit -1)
 
 # Install Kubernetes
-sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' | sudo tee -a /etc/apt/sources.list.d/kubernetes.list
+sudo rm /etc/apt/sources.list.d/kubernetes.list
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 sudo apt update
 sudo apt install -y kubelet=$KUBERNETES_VERSION_STRING kubeadm=$KUBERNETES_VERSION_STRING kubectl=$KUBERNETES_VERSION_STRING
 

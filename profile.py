@@ -16,17 +16,17 @@ import geni.rspec.pg as rspec
 
 BASE_IP = "10.10.1"
 BANDWIDTH = 10000000
-IMAGE = 'urn:publicid:IDN+wisc.cloudlab.us+image+praxis-PG0:openwhisk-v3-5.10'
+IMAGE = 'urn:publicid:IDN+wisc.cloudlab.us+image+praxis-PG0:openwhisk-v3-5.10.130'
 
 # Set up parameters
 pc = portal.Context()
-pc.defineParameter("nodeCount", 
+pc.defineParameter("nodeCount",
                    "Number of nodes in the experiment. It is recommended that at least 3 be used.",
-                   portal.ParameterType.INTEGER, 
+                   portal.ParameterType.INTEGER,
                    3)
-pc.defineParameter("nodeType", 
+pc.defineParameter("nodeType",
                    "Node Hardware Type",
-                   portal.ParameterType.NODETYPE, 
+                   portal.ParameterType.NODETYPE,
                    "m510",
                    longDescription="A specific hardware type to use for all nodes. This profile has primarily been tested with m510 and xl170 nodes.")
 pc.defineParameter("startKubernetes",
@@ -60,9 +60,9 @@ pc.defineParameter("schedulerEnabled",
                    longDescription="Enables the OpenWhisk scheduler component (and etcd). By default, this is enabled.")
 # Below option copy/pasted directly from small-lan experiment on CloudLab
 # Optional ephemeral blockstore
-pc.defineParameter("tempFileSystemSize", 
+pc.defineParameter("tempFileSystemSize",
                    "Temporary Filesystem Size",
-                   portal.ParameterType.INTEGER, 
+                   portal.ParameterType.INTEGER,
                    0,
                    advanced=True,
                    longDescription="The size in GB of a temporary file system to mount on each of your " +
@@ -85,17 +85,17 @@ def create_node(name, nodes, lan):
   node = request.RawPC(name)
   node.disk_image = IMAGE
   node.hardware_type = params.nodeType
-  
+
   # Add interface
   iface = node.addInterface("if1")
   iface.addAddress(rspec.IPv4Address("{}.{}".format(BASE_IP, 1 + len(nodes)), "255.255.255.0"))
   lan.addInterface(iface)
-  
+
   # Add extra storage space
   bs = node.Blockstore(name + "-bs", "/mydata")
   bs.size = str(params.tempFileSystemSize) + "GB"
   bs.placement = "any"
-  
+
   # Add to node list
   nodes.append(node)
 
