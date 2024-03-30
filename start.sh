@@ -31,7 +31,7 @@ configure_docker_storage() {
 disable_swap() {
     # Turn swap off and comment out swap line in /etc/fstab
     sudo swapoff -a
-    if [ $? -eq 0 ]; then   
+    if [ $? -eq 0 ]; then
         printf "%s: %s\n" "$(date +"%T.%N")" "Turned off swap"
     else
         echo "***Error: Failed to turn off swap, which is necessary for Kubernetes"
@@ -48,7 +48,7 @@ setup_secondary() {
         case $cmd in
             *"kube"*)
                 MY_CMD=$cmd
-                break 
+                break
                 ;;
             *)
 	    	printf "%s: %s\n" "$(date +"%T.%N")" "Read: $cmd"
@@ -97,7 +97,7 @@ setup_primary() {
 
 apply_calico() {
     # https://projectcalico.docs.tigera.io/getting-started/kubernetes/helm
-    helm repo add projectcalico https://projectcalico.docs.tigera.io/charts > $INSTALL_DIR/calico_install.log 2>&1 
+    helm repo add projectcalico https://projectcalico.docs.tigera.io/charts > $INSTALL_DIR/calico_install.log 2>&1
     if [ $? -ne 0 ]; then
        echo "***Error: Error when loading helm calico repo. Log written to $INSTALL_DIR/calico_install.log"
        exit 1
@@ -124,7 +124,7 @@ apply_calico() {
         NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
     done
     printf "%s: %s\n" "$(date +"%T.%N")" "Calico pods running!"
-    
+
     # wait for kube-system pods to be in ready state
     printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for all system pods to have status of 'Running': "
     NUM_PODS=$(kubectl get pods -n kube-system | wc -l)
@@ -148,7 +148,7 @@ add_cluster_nodes() {
     NUM_REGISTERED=$(($1-NUM_REGISTERED+1))
     counter=0
     while [ "$NUM_REGISTERED" -ne 0 ]
-    do 
+    do
 	sleep 2
         printf "%s: %s\n" "$(date +"%T.%N")" "Registering nodes, attempt #$counter, registered=$NUM_REGISTERED"
         for (( i=2; i<=$1; i++ ))
@@ -161,7 +161,7 @@ add_cluster_nodes() {
         done
 	counter=$((counter+1))
         NUM_REGISTERED=$(kubectl get nodes | wc -l)
-        NUM_REGISTERED=$(($1-NUM_REGISTERED+1)) 
+        NUM_REGISTERED=$(($1-NUM_REGISTERED+1))
     done
 
     printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for all nodes to have status of 'Ready': "
@@ -220,7 +220,7 @@ prepare_for_openwhisk() {
     sudo chown $USER:$PROFILE_GROUP $INSTALL_DIR/openwhisk-deploy-kube/mycluster.yaml
     sudo chmod -R g+rw $INSTALL_DIR/openwhisk-deploy-kube/mycluster.yaml
     printf "%s: %s\n" "$(date +"%T.%N")" "Updated $INSTALL_DIR/openwhisk-deploy-kube/mycluster.yaml"
-    
+
     if [ $4 == "docker" ] ; then
         if test -d "/mydata"; then
 	    sed -i.bak "s/\/var\/lib\/docker\/containers/\/mydata\/docker\/containers/g" $INSTALL_DIR/openwhisk-deploy-kube/helm/openwhisk/templates/_invoker-helpers.tpl
@@ -236,7 +236,7 @@ deploy_openwhisk() {
     # Deploy openwhisk via helm
     printf "%s: %s\n" "$(date +"%T.%N")" "About to deploy OpenWhisk via Helm... "
     cd $INSTALL_DIR/openwhisk-deploy-kube
-    helm install owdev ./helm/openwhisk -n openwhisk -f mycluster.yaml > $INSTALL_DIR/ow_install.log 2>&1 
+    helm install owdev ./helm/openwhisk -n openwhisk -f mycluster.yaml > $INSTALL_DIR/ow_install.log 2>&1
     if [ $? -eq 0 ]; then
         printf "%s: %s\n" "$(date +"%T.%N")" "Ran helm command to deploy OpenWhisk"
     else
@@ -256,7 +256,7 @@ deploy_openwhisk() {
         DEPLOY_COMPLETE=$(kubectl get pods -n openwhisk | grep owdev-install-packages | grep Completed | wc -l)
     done
     printf "%s: %s\n" "$(date +"%T.%N")" "OpenWhisk deployed!"
-    
+
     # Set up wsk properties for all users
     for FILE in /users/*; do
         CURRENT_USER=${FILE##*/}
@@ -318,11 +318,11 @@ if [ $1 == $SECONDARY_ARG ] ; then
         printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $3, done!"
         exit 0
     fi
-    
+
     # Use second argument (node IP) to replace filler in kubeadm configuration
-    cat /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-    cat /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+    cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
 
     setup_secondary $2
     exit 0
@@ -342,9 +342,9 @@ if [ "$4" = "False" ]; then
 fi
 
 # Use second argument (node IP) to replace filler in kubeadm configuration
-cat /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-cat /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
 
 # Finish setting up the primary node
 # Argument is node_ip
