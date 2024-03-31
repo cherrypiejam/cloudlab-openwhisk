@@ -4,7 +4,8 @@ set -x
 # Use particular docker and kubernetes versions. When I've tried to upgrade, I've seen slowdowns in
 # pod creation.
 DOCKER_VERSION_STRING=5:20.10.12~3-0~ubuntu-focal
-KUBERNETES_VERSION_STRING=1.28.8-1.1
+KUBERNETES_VERSION=v1.24
+KUBERNETES_VERSION_STRING=1.24.17-1.1
 
 # Unlike home directories, this directory will be included in the image
 OW_USER_GROUP=owuser
@@ -52,9 +53,9 @@ sudo docker run hello-world | grep "Hello from Docker!" || (echo "ERROR: Docker 
 
 # Install Kubernetes
 sudo rm /etc/apt/sources.list.d/kubernetes.list
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 mkdir -p /etc/apt/keyrings
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 sudo apt update
 sudo apt install -y kubelet=$KUBERNETES_VERSION_STRING kubeadm=$KUBERNETES_VERSION_STRING kubectl=$KUBERNETES_VERSION_STRING
 
