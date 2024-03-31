@@ -41,6 +41,9 @@ disable_swap() {
 }
 
 setup_secondary() {
+    # CRI is disabled by default, remove this config
+    sudo rm /etc/containerd/config.toml
+    sudo systemctl restart containerd
     coproc nc { nc -l $1 $SECONDARY_PORT; }
     while true; do
         printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for command to join kubernetes cluster, nc pid is $nc_PID"
