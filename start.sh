@@ -41,9 +41,6 @@ disable_swap() {
 }
 
 setup_secondary() {
-    # CRI is disabled by default, remove this config
-    sudo rm /etc/containerd/config.toml
-    sudo systemctl restart containerd
     coproc nc { nc -l $1 $SECONDARY_PORT; }
     while true; do
         printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for command to join kubernetes cluster, nc pid is $nc_PID"
@@ -75,9 +72,6 @@ setup_secondary() {
 }
 
 setup_primary() {
-    # CRI is disabled by default, remove this config
-    sudo rm /etc/containerd/config.toml
-    sudo systemctl restart containerd
     # initialize k8 primary node
     printf "%s: %s\n" "$(date +"%T.%N")" "Starting Kubernetes... (this can take several minutes)... "
     sudo kubeadm init --apiserver-advertise-address=$1 --pod-network-cidr=10.11.0.0/16 > $INSTALL_DIR/k8s_install.log 2>&1
