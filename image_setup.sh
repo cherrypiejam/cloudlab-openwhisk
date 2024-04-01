@@ -80,8 +80,6 @@ sudo systemctl enable kubelet.service
 sudo apt install -y socat conntrack
 
 # Set to use private IP
-# sudo sed -i.bak "s/KUBELET_CONFIG_ARGS=--config=\/var\/lib\/kubelet\/config\.yaml/KUBELET_CONFIG_ARGS=--config=\/var\/lib\/kubelet\/config\.yaml --node-ip=REPLACE_ME_WITH_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-
 sudo sed -i.bak "s/KUBELET_CONFIG_ARGS=--config=\/var\/lib\/kubelet\/config\.yaml/KUBELET_CONFIG_ARGS=--config=\/var\/lib\/kubelet\/config\.yaml --node-ip=REPLACE_ME_WITH_IP/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
 
 # Download and install the OpenWhisk CLI
