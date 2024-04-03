@@ -294,81 +294,81 @@ fi
 # Kubernetes does not support swap, so we must disable it
 disable_swap
 
-# Use mountpoint (if it exists) to set up additional docker image storage
-if test -d "/mydata"; then
-    configure_docker_storage
-fi
+# # Use mountpoint (if it exists) to set up additional docker image storage
+# if test -d "/mydata"; then
+#     configure_docker_storage
+# fi
 
-# All all users to the docker group
+# # All all users to the docker group
 
-# Fix permissions of install dir, add group for all users to set permission of shared files correctly
-sudo groupadd $PROFILE_GROUP
-for FILE in /users/*; do
-    CURRENT_USER=${FILE##*/}
-    sudo gpasswd -a $CURRENT_USER $PROFILE_GROUP
-    sudo gpasswd -a $CURRENT_USER docker
-done
-sudo chown -R $USER:$PROFILE_GROUP $INSTALL_DIR
-sudo chmod -R g+rw $INSTALL_DIR
+# # Fix permissions of install dir, add group for all users to set permission of shared files correctly
+# sudo groupadd $PROFILE_GROUP
+# for FILE in /users/*; do
+#     CURRENT_USER=${FILE##*/}
+#     sudo gpasswd -a $CURRENT_USER $PROFILE_GROUP
+#     sudo gpasswd -a $CURRENT_USER docker
+# done
+# sudo chown -R $USER:$PROFILE_GROUP $INSTALL_DIR
+# sudo chmod -R g+rw $INSTALL_DIR
 
-# At this point, a secondary node is fully configured until it is time for the node to join the cluster.
-if [ $1 == $SECONDARY_ARG ] ; then
+# # At this point, a secondary node is fully configured until it is time for the node to join the cluster.
+# if [ $1 == $SECONDARY_ARG ] ; then
 
-    # Exit early if we don't need to start Kubernetes
-    if [ "$3" == "False" ]; then
-        printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $3, done!"
-        exit 0
-    fi
+#     # Exit early if we don't need to start Kubernetes
+#     if [ "$3" == "False" ]; then
+#         printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $3, done!"
+#         exit 0
+#     fi
 
-    # Use second argument (node IP) to replace filler in kubeadm configuration
-    cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
-    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
-    cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+#     # Use second argument (node IP) to replace filler in kubeadm configuration
+#     cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+#     sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+#     cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
 
-    setup_secondary $2
-    exit 0
-fi
+#     setup_secondary $2
+#     exit 0
+# fi
 
-# Check the min number of arguments
-if [ $# -ne $NUM_PRIMARY_ARGS ]; then
-    echo "***Error: Expected at least $NUM_PRIMARY_ARGS arguments."
-    echo "$USAGE"
-    exit -1
-fi
+# # Check the min number of arguments
+# if [ $# -ne $NUM_PRIMARY_ARGS ]; then
+#     echo "***Error: Expected at least $NUM_PRIMARY_ARGS arguments."
+#     echo "$USAGE"
+#     exit -1
+# fi
 
-# Exit early if we don't need to start Kubernetes
-if [ "$4" = "False" ]; then
-    printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $4, done!"
-    exit 0
-fi
+# # Exit early if we don't need to start Kubernetes
+# if [ "$4" = "False" ]; then
+#     printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $4, done!"
+#     exit 0
+# fi
 
-# Use second argument (node IP) to replace filler in kubeadm configuration
-cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
-sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
-cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+# # Use second argument (node IP) to replace filler in kubeadm configuration
+# cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+# sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+# cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
 
-# Finish setting up the primary node
-# Argument is node_ip
-setup_primary $2
+# # Finish setting up the primary node
+# # Argument is node_ip
+# setup_primary $2
 
-# Apply calico networking
-apply_calico
+# # Apply calico networking
+# apply_calico
 
-# Coordinate master to add nodes to the kubernetes cluster
-# Argument is number of nodes
-add_cluster_nodes $3
+# # Coordinate master to add nodes to the kubernetes cluster
+# # Argument is number of nodes
+# add_cluster_nodes $3
 
-# Exit early if we don't need to deploy OpenWhisk
-if [ "$5" = "False" ]; then
-    printf "%s: %s\n" "$(date +"%T.%N")" "Deploy Openwhisk is $4, done!"
-    exit 0
-fi
+# # Exit early if we don't need to deploy OpenWhisk
+# if [ "$5" = "False" ]; then
+#     printf "%s: %s\n" "$(date +"%T.%N")" "Deploy Openwhisk is $4, done!"
+#     exit 0
+# fi
 
-# Prepare cluster to deploy OpenWhisk: takes IP, num nodes, invoker num, invoker engine, and scheduler enabled
-prepare_for_openwhisk $2 $3 $6 $7 $8
+# # Prepare cluster to deploy OpenWhisk: takes IP, num nodes, invoker num, invoker engine, and scheduler enabled
+# prepare_for_openwhisk $2 $3 $6 $7 $8
 
-# Deploy OpenWhisk via Helm
-# Takes cluster IP
-deploy_openwhisk $2
+# # Deploy OpenWhisk via Helm
+# # Takes cluster IP
+# deploy_openwhisk $2
 
 printf "%s: %s\n" "$(date +"%T.%N")" "Profile setup completed!"
