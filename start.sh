@@ -40,37 +40,6 @@ disable_swap() {
     sudo sed -i.bak 's/UUID=.*swap/# &/' /etc/fstab
 }
 
-setup_secondary() {
-    coproc nc { nc -l $1 $SECONDARY_PORT; }
-    while true; do
-        printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for command to join kubernetes cluster, nc pid is $nc_PID"
-        read -r -u${nc[0]} cmd
-        case $cmd in
-            *"kube"*)
-                MY_CMD=$cmd
-                break
-                ;;
-            *)
-	    	printf "%s: %s\n" "$(date +"%T.%N")" "Read: $cmd"
-                ;;
-        esac
-	if [ -z "$nc_PID" ]
-	then
-	    printf "%s: %s\n" "$(date +"%T.%N")" "Restarting listener via netcat..."
-	    coproc nc { nc -l $1 $SECONDARY_PORT; }
-	fi
-    done
-
-    # Remove forward slash, since original command was on two lines
-    MY_CMD=$(echo sudo $MY_CMD | sed 's/\\//')
-
-    printf "%s: %s\n" "$(date +"%T.%N")" "Command to execute is: $MY_CMD"
-
-    # run command to join kubernetes cluster
-    eval $MY_CMD
-    printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
-}
-
 setup_primary() {
     # initialize k8 primary node
     printf "%s: %s\n" "$(date +"%T.%N")" "Starting Kubernetes... (this can take several minutes)... "
@@ -141,48 +110,14 @@ apply_calico() {
     printf "%s: %s\n" "$(date +"%T.%N")" "Kubernetes system pods running!"
 }
 
-add_cluster_nodes() {
-    REMOTE_CMD=$(tail -n 2 $INSTALL_DIR/k8s_install.log)
-    printf "%s: %s\n" "$(date +"%T.%N")" "Remote command is: $REMOTE_CMD"
-
-    NUM_REGISTERED=$(kubectl get nodes | wc -l)
-    NUM_REGISTERED=$(($1-NUM_REGISTERED+1))
-    counter=0
-    while [ "$NUM_REGISTERED" -ne 0 ]
-    do
-	sleep 2
-        printf "%s: %s\n" "$(date +"%T.%N")" "Registering nodes, attempt #$counter, registered=$NUM_REGISTERED"
-        for (( i=2; i<=$1; i++ ))
-        do
-            SECONDARY_IP=$BASE_IP$i
-            echo $SECONDARY_IP
-            exec 3<>/dev/tcp/$SECONDARY_IP/$SECONDARY_PORT
-            echo $REMOTE_CMD 1>&3
-            exec 3<&-
-        done
-	counter=$((counter+1))
-        NUM_REGISTERED=$(kubectl get nodes | wc -l)
-        NUM_REGISTERED=$(($1-NUM_REGISTERED+1))
-    done
-
-    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for all nodes to have status of 'Ready': "
-    NUM_READY=$(kubectl get nodes | grep " Ready" | wc -l)
-    NUM_READY=$(($1-NUM_READY))
-    while [ "$NUM_READY" -ne 0 ]
-    do
-        sleep 1
-        printf "."
-        NUM_READY=$(kubectl get nodes | grep " Ready" | wc -l)
-        NUM_READY=$(($1-NUM_READY))
-    done
-    printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
-}
 
 prepare_for_openwhisk() {
     # Args: 1 = IP, 2 = num nodes, 3 = num invokers, 4 = invoker engine, 5 = scheduler enabled
 
     # Use latest version of openwhisk-deploy-kube
-    pushd $INSTALL_DIR/openwhisk-deploy-kube
+    git clone https://github.com/cherrypiejam/faasten.git $ISNTALL_DIR
+
+    pushd $INSTALL_DIR/faasten
     git pull
     popd
 
@@ -231,44 +166,6 @@ prepare_for_openwhisk() {
 }
 
 
-deploy_openwhisk() {
-    # Takes cluster IP as argument to set up wskprops files.
-
-    # Deploy openwhisk via helm
-    printf "%s: %s\n" "$(date +"%T.%N")" "About to deploy OpenWhisk via Helm... "
-    cd $INSTALL_DIR/openwhisk-deploy-kube
-    helm install owdev ./helm/openwhisk -n openwhisk -f mycluster.yaml > $INSTALL_DIR/ow_install.log 2>&1
-    if [ $? -eq 0 ]; then
-        printf "%s: %s\n" "$(date +"%T.%N")" "Ran helm command to deploy OpenWhisk"
-    else
-        echo ""
-        echo "***Error: Helm install error. Please check $INSTALL_DIR/ow_install.log."
-        exit 1
-    fi
-    cd $INSTALL_DIR
-
-    # Monitor pods until openwhisk is fully deployed
-    kubectl get pods -n openwhisk
-    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for OpenWhisk to complete deploying (this can take several minutes): "
-    DEPLOY_COMPLETE=$(kubectl get pods -n openwhisk | grep owdev-install-packages | grep Completed | wc -l)
-    while [ "$DEPLOY_COMPLETE" -ne 1 ]
-    do
-        sleep 2
-        DEPLOY_COMPLETE=$(kubectl get pods -n openwhisk | grep owdev-install-packages | grep Completed | wc -l)
-    done
-    printf "%s: %s\n" "$(date +"%T.%N")" "OpenWhisk deployed!"
-
-    # Set up wsk properties for all users
-    for FILE in /users/*; do
-        CURRENT_USER=${FILE##*/}
-        echo -e "
-	APIHOST=$1:31001
-	AUTH=23bc46b1-71f6-4ed5-8c54-816aa4f8c502:123zO3xZCLrMN6v2BKK1dXYFpXlPkccOFqm12CdAsMgRU4VrNZ9lyGVCGuMDGIwP
-	" | sudo tee /users/$CURRENT_USER/.wskprops
-	sudo chown $CURRENT_USER:$PROFILE_GROUP /users/$CURRENT_USER/.wskprops
-    done
-}
-
 # Start by recording the arguments
 printf "%s: args=(" "$(date +"%T.%N")"
 for var in "$@"
@@ -294,81 +191,79 @@ fi
 # Kubernetes does not support swap, so we must disable it
 disable_swap
 
-# # Use mountpoint (if it exists) to set up additional docker image storage
-# if test -d "/mydata"; then
-#     configure_docker_storage
-# fi
+# Use mountpoint (if it exists) to set up additional docker image storage
+if test -d "/mydata"; then
+    configure_docker_storage
+fi
 
-# # All all users to the docker group
+# All all users to the docker group
 
-# # Fix permissions of install dir, add group for all users to set permission of shared files correctly
-# sudo groupadd $PROFILE_GROUP
-# for FILE in /users/*; do
-#     CURRENT_USER=${FILE##*/}
-#     sudo gpasswd -a $CURRENT_USER $PROFILE_GROUP
-#     sudo gpasswd -a $CURRENT_USER docker
-# done
-# sudo chown -R $USER:$PROFILE_GROUP $INSTALL_DIR
-# sudo chmod -R g+rw $INSTALL_DIR
+# Fix permissions of install dir, add group for all users to set permission of shared files correctly
+sudo groupadd $PROFILE_GROUP
+for FILE in /users/*; do
+    CURRENT_USER=${FILE##*/}
+    sudo gpasswd -a $CURRENT_USER $PROFILE_GROUP
+    sudo gpasswd -a $CURRENT_USER docker
+done
+sudo chown -R $USER:$PROFILE_GROUP $INSTALL_DIR
+sudo chmod -R g+rw $INSTALL_DIR
 
-# # At this point, a secondary node is fully configured until it is time for the node to join the cluster.
-# if [ $1 == $SECONDARY_ARG ] ; then
+# At this point, a secondary node is fully configured until it is time for the node to join the cluster.
+if [ $1 == $SECONDARY_ARG ] ; then
 
-#     # Exit early if we don't need to start Kubernetes
-#     if [ "$3" == "False" ]; then
-#         printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $3, done!"
-#         exit 0
-#     fi
+    SECONDARY_IP=$2
+    SECONDARY_DATA_DIR=/mydata/tikv
 
-#     # Use second argument (node IP) to replace filler in kubeadm configuration
-#     cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
-#     sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
-#     cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+    sudo mkdir -p $SECONDARY_DATA_DIR
 
-#     setup_secondary $2
-#     exit 0
-# fi
+    sudo docker pull pingcap/tikv:latest
+    sudo docker pull pingcap/pd:latest
 
-# # Check the min number of arguments
-# if [ $# -ne $NUM_PRIMARY_ARGS ]; then
-#     echo "***Error: Expected at least $NUM_PRIMARY_ARGS arguments."
-#     echo "$USAGE"
-#     exit -1
-# fi
+    sudo docker run -d --name pd1 \
+           -p 2379:2379 \
+           -p 2380:2380 \
+           -v /etc/localtime:/etc/localtime:ro \
+           -v $DATA_DIR:/data \
+           pingcap/pd:latest \
+           --name="pd1" \
+           --data-dir="/data/pd1" \
+           --client-urls="http://0.0.0.0:2379" \
+           --advertise-client-urls="http://$SECONDARY_IP:2379" \
+           --peer-urls="http://0.0.0.0:2380" \
+           --advertise-peer-urls="http://$SECONDARY_IP:2380" \
+           --initial-cluster="pd1=http://$SECONDARY_IP:2380"
 
-# # Exit early if we don't need to start Kubernetes
-# if [ "$4" = "False" ]; then
-#     printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $4, done!"
-#     exit 0
-# fi
+    sudo docker run -d --name tikv1 \
+           -p 20160:20160 \
+           -v /etc/localtime:/etc/localtime:ro \
+           -v $DATA_DIR:/data \
+           pingcap/tikv:latest \
+           --addr="0.0.0.0:20160" \
+           --advertise-addr="$SECONDARY_IP:20160" \
+           --data-dir="/data/tikv1" \
+           --pd="$SECONDARY_IP:2379"
 
-# # Use second argument (node IP) to replace filler in kubeadm configuration
-# cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
-# sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
-# cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+    curl $SECONDARY_IP:2379/pd/api/v1/stores
 
-# # Finish setting up the primary node
-# # Argument is node_ip
-# setup_primary $2
+    exit 0
+fi
 
-# # Apply calico networking
-# apply_calico
+# Check the min number of arguments
+if [ $# -ne $NUM_PRIMARY_ARGS ]; then
+    echo "***Error: Expected at least $NUM_PRIMARY_ARGS arguments."
+    echo "$USAGE"
+    exit -1
+fi
 
-# # Coordinate master to add nodes to the kubernetes cluster
-# # Argument is number of nodes
-# add_cluster_nodes $3
+PB_REL="https://github.com/protocolbuffers/protobuf/releases"
+curl -LO $PB_REL/download/v25.1/protoc-25.1-linux-x86_64.zip
+sudo unzip protoc-25.1-linux-x86_64.zip -d /usr/local/bin/
 
-# # Exit early if we don't need to deploy OpenWhisk
-# if [ "$5" = "False" ]; then
-#     printf "%s: %s\n" "$(date +"%T.%N")" "Deploy Openwhisk is $4, done!"
-#     exit 0
-# fi
+sudo apt -y install bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm squashfs-tools-ng
 
-# # Prepare cluster to deploy OpenWhisk: takes IP, num nodes, invoker num, invoker engine, and scheduler enabled
-# prepare_for_openwhisk $2 $3 $6 $7 $8
-
-# # Deploy OpenWhisk via Helm
-# # Takes cluster IP
-# deploy_openwhisk $2
+for FILE in /users/*; do
+    CURRENT_USER=${FILE##*/}
+    sudo gpasswd -a $CURRENT_USER kvm
+done
 
 printf "%s: %s\n" "$(date +"%T.%N")" "Profile setup completed!"
