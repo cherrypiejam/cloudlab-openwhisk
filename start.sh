@@ -256,8 +256,8 @@ if [ $# -ne $NUM_PRIMARY_ARGS ]; then
 fi
 
 PB_REL="https://github.com/protocolbuffers/protobuf/releases"
-curl -LO $PB_REL/download/v25.1/protoc-25.1-linux-x86_64.zip
-sudo unzip protoc-25.1-linux-x86_64.zip -d /usr/local/bin/
+sudo curl -LO $PB_REL/download/v25.1/protoc-25.1-linux-x86_64.zip
+sudo unzip protoc-25.1-linux-x86_64.zip -d /usr/local/
 
 sudo apt -y install bridge-utils cpu-checker libvirt-clients libvirt-daemon qemu qemu-kvm squashfs-tools-ng
 
